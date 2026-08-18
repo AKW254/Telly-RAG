@@ -53,10 +53,8 @@ Base = declarative_base()
 # --------------------------------------------------
 
 def init_db():
-    """
-    Initialize database tables.
-    NOTE: Requires models to be imported before execution.
-    """
+   
+    #Initialize database tables.
     import app.models  # ensures all models are registered
     Base.metadata.create_all(bind=engine)
 
