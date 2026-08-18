@@ -13,7 +13,7 @@ from contextlib import contextmanager
 DATABASE_URL = URL.create(
      drivername="postgresql+psycopg2",
     username=settings.db_user,
-    password=settings.db_pass,
+    password=settings.db_password,
     host=settings.db_host,
     port=settings.db_port,
     database=settings.db_name,

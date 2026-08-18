@@ -1,7 +1,7 @@
 from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, Text, func
 from sqlalchemy.orm import relationship
 
-from app.database import Base
+from app.database.database import Base
 
 class ChatMessage(Base):
     __tablename__ = "chat_messages"
