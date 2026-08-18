@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.config.settings import settings
 
 #Database 
-#from app.database.database import init_db
+from app.database.database import init_db
 
 #Middlewares
 #from app.middlewares.brokerAvailabilityMiddleware import BrokerAvailabilityMiddleware
@@ -63,7 +63,7 @@ def create_app()-> FastAPI:
     @app.on_event("startup")
     async def startup_event():
         logger.info("Starting Telly RAG Chatbot API...")
-        #init_db()
+        init_db()
 
 # --------------------------------------------------
 # Shutdown Event
