@@ -15,7 +15,7 @@ from app.middlewares.ratelimit_middleware import RateLimitMiddleware
 
 #Routes
 from app.api.routes.auth import router as auth
-# from app.api.routes.documents import router as documents
+from app.api.routes.documents import router as documents
 # from app.api.routes.chats import router as chats
 
 #Logger 
@@ -54,7 +54,7 @@ def create_app()-> FastAPI:
 # Routes
 # --------------------------------------------------  
     app.include_router(auth,prefix="/api/auth", tags=["auth"])
-    # app.include_router(documents.router,prefix="/api/documents",tag=["documents"])
+    app.include_router(documents, prefix="/api/documents", tags=["documents"])
     # app.include_router(chats.router,prefix="/api/chats", tags=["chats"])
     
 # --------------------------------------------------

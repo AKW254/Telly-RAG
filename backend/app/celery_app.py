@@ -29,6 +29,7 @@ celery_app = Celery(
     broker=settings.celery_broker_url,
     backend=settings.celery_result_backend,
     include=[
+        "app.tasks.document_tasks",
         "app.tasks.mailer_tasks",
     ],
 )
