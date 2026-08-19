@@ -22,7 +22,7 @@ class IngestionService:
         user_id: int,
         replace_existing: bool = True,
     ):
-        # Remove old chunks before reading the replacement. If extraction or
+       
         # indexing fails, stale content must not remain available to retrieval.
         if replace_existing:
             self.indexer.delete_document_embeddings(

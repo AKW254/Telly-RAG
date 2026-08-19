@@ -30,6 +30,8 @@ dist/
 build/
 *.log
 npm-debug.log*
+storage/
+documents/
 
 # ---------------------------------------------------------------------
 # IDEs and Editors
