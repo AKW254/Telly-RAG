@@ -39,7 +39,7 @@ class UserService:
         if not user or not verify_password(user_in.password, user.password):
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password")
 
-        access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+        access_token_expires = timedelta(minutes=settings.access_token_expire_minutes)
         access_token = create_access_token(data={"sub": user.email}, expires_delta=access_token_expires)
         return AuthResponse(access_token=access_token, token_type="bearer", user=UserResponse.model_validate(user))
 
