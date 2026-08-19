@@ -1,0 +1,25 @@
+Welcome to {{ app_name }}!
+
+Hi {{ user_name }},
+
+Thank you for joining {{ app_name }}. We're excited to have you on board!
+
+Your account has been successfully created and is ready to use. You can now:
+- Complete your profile
+- Start Exploring Your Telly RAG
+- Upload and optimize your Documents
+- Enjoy premium features
+
+
+
+
+If you have any questions or need assistance, don't hesitate to reach out to our support team.
+
+Happy getting Answers!
+
+Best regards,
+The {{ app_name }} Team
+
+---
+This is an automated message, please do not reply to this email.
+&copy; 2026 {{ app_name }}. All rights reserved.

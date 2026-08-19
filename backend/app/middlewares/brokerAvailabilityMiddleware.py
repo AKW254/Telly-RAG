@@ -12,8 +12,8 @@ class BrokerAvailabilityMiddleware(BaseHTTPMiddleware):
 
     # Endpoints that require broker availability
     QUEUE_DEPENDENT_ENDPOINTS = [
-        "/api/cv/add",
-        "/api/cv/update",
+        "/api/document/add",
+        "/api/document/update",
     ]
 
     def _is_broker_dependent_request(self, request: Request) -> bool:

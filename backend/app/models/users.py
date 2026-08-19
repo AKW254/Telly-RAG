@@ -15,5 +15,5 @@ class User(Base):
     
     #Relationship
     chats = relationship("Chat", back_populates="user", cascade="all,delete-orphan")
-    documents = relationship("document", back_populates="user", cascade="all,delete-orphan")
+    documents = relationship("Document", back_populates="user", cascade="all,delete-orphan")
     

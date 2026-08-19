@@ -8,13 +8,13 @@ from app.config.settings import settings
 from app.database.database import init_db
 
 #Middlewares
-#from app.middlewares.brokerAvailabilityMiddleware import BrokerAvailabilityMiddleware
+from app.middlewares.brokerAvailabilityMiddleware import BrokerAvailabilityMiddleware
 from app.middlewares.logger_middleware import LoggingMiddleware
 from app.middlewares.ratelimit_middleware import RateLimitMiddleware
-from app.middlewares.securityheader_middleware import SecurityHeadersMiddleware
+#from app.middlewares.securityheader_middleware import SecurityHeadersMiddleware
 
 #Routes
-# from app.api.routes.auth import router as auth
+from app.api.routes.auth import router as auth
 # from app.api.routes.documents import router as documents
 # from app.api.routes.chats import router as chats
 
@@ -44,16 +44,16 @@ def create_app()-> FastAPI:
             allow_headers=["*"],
             )
     #User Defined
-    #app.add_middleware(BrokerAvailabilityMiddleware)
+    app.add_middleware(BrokerAvailabilityMiddleware)
     app.add_middleware(LoggingMiddleware)
     app.add_middleware(RateLimitMiddleware)
-    app.add_middleware(SecurityHeadersMiddleware)
+    #app.add_middleware(SecurityHeadersMiddleware)
     
   
 # --------------------------------------------------
 # Routes
 # --------------------------------------------------  
-    # app.include_router(auth.router,prefix="/api/auth", tags=["auth"])
+    app.include_router(auth,prefix="/api/auth", tags=["auth"])
     # app.include_router(documents.router,prefix="/api/documents",tag=["documents"])
     # app.include_router(chats.router,prefix="/api/chats", tags=["chats"])
     

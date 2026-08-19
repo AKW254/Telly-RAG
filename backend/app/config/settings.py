@@ -61,7 +61,7 @@ class Settings(BaseSettings):
     email_user: str | None = None
     email_pass: str | None = None
     email_from: str | None = None
-    email_from_name: str = "Job Hunter"
+    email_from_name: str = "Telly RAG"
     email_enabled: bool = True
     email_templates_dir: Path = BASE_DIR / "app" / "mailer" / "templates"
     
