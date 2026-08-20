@@ -12,11 +12,17 @@ from app.cache.chat_cache import ChatCache
 from app.cache.factory import get_cache
 
 from app.rag.retrieval.RetrieverService import RetrieverService
+from app.rag.generation.generatorService import GeneratorService
 
 class ChatService:
     TITLE_MAX_LENGTH = 80
 
-    def __init__(self,db: Session, chat_cache: ChatCache| None = None, retriever: RetrieverService | None = None, ):
+    def __init__(
+        self,db: Session, 
+        chat_cache: ChatCache| None = None,
+        retriever: RetrieverService | None = None,
+        generator: GeneratorService | None = None,
+        ):
         self.db = db
         self.chat_cache = (
             chat_cache
@@ -29,6 +35,11 @@ class ChatService:
                     if retriever is not None
                     else RetrieverService()
             )
+        self.generator = (
+            generator
+            if generator is not None
+            else GeneratorService()
+        )
         
     # ==========================================================
     # CHAT
@@ -98,59 +109,137 @@ class ChatService:
     # ==========================================================
     # CHAT MESSAGE
     # ==========================================================
-    #User question
-    def process_message(self,chat_id: int,user_id: int, message_in: ChatMessageCreate,) -> ChatMessage:
-        chat = (self.db.query(Chat).filter(Chat.id == chat_id,Chat.user_id == user_id,).first())
-
-        if not chat:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Chat not found",
-            )
-        message = ChatMessage(chat_id=chat_id,role="user",content=message_in.content)
-
-        # Preserve user-supplied titles; otherwise title the chat from its first question.
-        if not chat.title or not chat.title.strip():
-            chat.title = self._title_from_message(message_in.content)
-        
-        self.db.add(message)
-        self.db.commit()
-        self.db.refresh(message) 
-        
-        #Add to cache
-        self.chat_cache.add_message(user_id=user_id,chat_id=chat_id,role="user",content=message_in.content,) 
-        #Retrieve Phase
-        self.retriever.retrieve(query=message_in.content,user_id=user_id,)
-        return message 
-    #AI Response
+    #Save Response
     def create_assistant_message(self,chat_id: int,user_id: int,content: str,) -> ChatMessage:
+      chat = (self.db.query(Chat).filter(Chat.id == chat_id,Chat.user_id == user_id,).first())
+      if not chat: 
+          raise HTTPException( status_code=status.HTTP_404_NOT_FOUND, detail="Chat not found", ) 
+      # Save assistant response 
+      message = ChatMessage( chat_id=chat_id, role="assistant", content=content, )
+      self.db.add(message) 
+      self.db.commit() 
+      self.db.refresh(message) 
+      # Cache assistant response 
+      self.chat_cache.add_message(
+          user_id=user_id,
+          chat_id=chat_id,
+          role="assistant",
+          content=content,
+          ) 
+      return message
+    
+        # GET CONVERSATION HISTORY
+       
+    def get_conversation_history(self,chat_id: int,user_id: int,) -> list[dict]:
+    
+        chat = (self.db.query(Chat).filter(Chat.id == chat_id,Chat.user_id == user_id,).first())
+    
+        if not chat:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Chat not found",
+                )
+    
+        # Try cache first
+        cached_messages = self.chat_cache.get_history(user_id=user_id,chat_id=chat_id,)
+        if cached_messages:
+            return cached_messages
+            # Cache miss → load from database
+           
+        messages = (self.db.query(ChatMessage).filter(ChatMessage.chat_id == chat_id).order_by(ChatMessage.created_at.asc()).all())
+    
+        history = [
+                {
+                    "role": message.role,
+                    "content": message.content,
+                }
+                for message in messages
+            ]
+            
+            # Populate cache
+    
+        if history:
+            self.chat_cache.set_history(user_id=user_id,chat_id=chat_id,messages=history,)
+        return history    
+    
+    
+    #Retrival and Generation Pipeline
+    def process_message(self,chat_id: int,user_id: int,message_in: ChatMessageCreate,) -> ChatMessage:
+
+    # ==================================================
+    # Verify chat ownership
+    # ==================================================
 
         chat = (self.db.query(Chat).filter(Chat.id == chat_id,Chat.user_id == user_id,).first())
 
         if not chat:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Chat not found",
-            )
-            
-        # Save assistant response
-    
-        message = ChatMessage(
-            chat_id=chat_id,
-            role="assistant",
-            content=content,
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Chat not found",
         )
 
-        self.db.add(message)
+    # ==================================================
+    # Save user message
+    # ==================================================
+
+        user_message = ChatMessage(
+            chat_id=chat_id,
+            role="user",
+            content=message_in.content,
+        )
+
+        if not chat.title or not chat.title.strip():
+            chat.title = self._title_from_message(
+            message_in.content
+        )
+
+        self.db.add(user_message)
         self.db.commit()
-        self.db.refresh(message)
+        self.db.refresh(user_message)
 
-        # Cache assistant response
+     # Cache user message
 
-        self.chat_cache.add_message(user_id=user_id,chat_id=chat_id,role="assistant",content=content,)
+        self.chat_cache.add_message(
+            user_id=user_id,
+            chat_id=chat_id,
+            role="user",
+            content=message_in.content,
+        )
 
-        return message
+    # Get conversation history    
+        history = self.get_conversation_history(
+            chat_id=chat_id,
+            user_id=user_id,
+        )
 
+    # ==================================================
+    # RETRIEVAL
+    # ==================================================
+
+        documents = self.retriever.retrieve(
+            query=message_in.content,
+            user_id=user_id,
+            top_k=5,
+        )
+
+    # ==================================================
+    # GENERATION
+    # ==================================================
+
+        answer = self.generator.generate(
+            question=message_in.content,
+            documents=documents,
+            chat_history=history,
+        )
+
+    
+    # Save assistant message
+
+        return self.create_assistant_message(
+            chat_id=chat_id,
+            user_id=user_id,
+            content=answer,
+        )
  
     # LIST MESSAGES
   
@@ -166,45 +255,6 @@ class ChatService:
 
         return (self.db.query(ChatMessage).filter(ChatMessage.chat_id == chat_id).order_by(ChatMessage.created_at.asc()).all())
 
-    # ==========================================================
-    # GET CONVERSATION HISTORY
-    # ==========================================================
-
-    def get_conversation_history(self,chat_id: int,user_id: int,) -> list[dict]:
-
-        chat = (self.db.query(Chat).filter(Chat.id == chat_id,Chat.user_id == user_id,).first())
-
-        if not chat:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Chat not found",
-            )
-
-        # Try cache first
-
-        cached_messages = self.chat_cache.get_history(user_id=user_id,chat_id=chat_id,)
-
-        if cached_messages:
-            return cached_messages
-
-        
-        # Cache miss → load from database
-       
-        messages = (self.db.query(ChatMessage).filter(ChatMessage.chat_id == chat_id).order_by(ChatMessage.created_at.asc()).all())
-
-        history = [
-            {
-                "role": message.role,
-                "content": message.content,
-            }
-            for message in messages
-        ]
-        
-        # Populate cache
-
-        if history:
-            self.chat_cache.set_history(user_id=user_id,chat_id=chat_id,messages=history,)
-        return history    
-
+    
 
         
