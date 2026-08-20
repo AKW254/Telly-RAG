@@ -11,17 +11,23 @@ from app.schemas.chat_messages_schema import ChatMessageCreate
 from app.cache.chat_cache import ChatCache
 from app.cache.factory import get_cache
 
+from app.rag.retrieval.RetrieverService import RetrieverService
 
 class ChatService:
     TITLE_MAX_LENGTH = 80
 
-    def __init__(self,db: Session, chat_cache: ChatCache| None = None, ):
+    def __init__(self,db: Session, chat_cache: ChatCache| None = None, retriever: RetrieverService | None = None, ):
         self.db = db
         self.chat_cache = (
             chat_cache
             if chat_cache is not None
             else ChatCache(get_cache())
     
+            )
+        self.retriever =(
+                    retriever
+                    if retriever is not None
+                    else RetrieverService()
             )
         
     # ==========================================================
@@ -93,7 +99,7 @@ class ChatService:
     # CHAT MESSAGE
     # ==========================================================
     #User question
-    def create_message(self,chat_id: int,user_id: int, message_in: ChatMessageCreate,) -> ChatMessage:
+    def process_message(self,chat_id: int,user_id: int, message_in: ChatMessageCreate,) -> ChatMessage:
         chat = (self.db.query(Chat).filter(Chat.id == chat_id,Chat.user_id == user_id,).first())
 
         if not chat:
@@ -113,7 +119,8 @@ class ChatService:
         
         #Add to cache
         self.chat_cache.add_message(user_id=user_id,chat_id=chat_id,role="user",content=message_in.content,) 
-        
+        #Retrieve Phase
+        self.retriever.retrieve(query=message_in.content,user_id=user_id,)
         return message 
     #AI Response
     def create_assistant_message(self,chat_id: int,user_id: int,content: str,) -> ChatMessage:

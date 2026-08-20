@@ -20,6 +20,7 @@ from app.models.users import User
 from app.api.dependencies import get_current_user
 
 from app.services.chats_service import ChatService
+from app.rag.retrieval.RetrieverService import RetrieverService
 
 
 router = APIRouter()
@@ -172,13 +173,11 @@ def create_message(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """
-    Add a message to an existing chat.
-    """
+   
 
     service = ChatService(db)
 
-    return service.create_message(
+    return service.process_message(
         chat_id=chat_id,
         user_id=current_user.id,
         message_in=message_in,
