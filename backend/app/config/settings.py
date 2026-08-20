@@ -65,6 +65,9 @@ class Settings(BaseSettings):
     email_enabled: bool = True
     email_templates_dir: Path = BASE_DIR / "app" / "mailer" / "templates"
     
+    #=============== Cache ======================
+    redis_url: str
+    
     # ============= DOCUMENTS STORAGE =============
     documents_dir: Path = BASE_DIR / "documents"
     
