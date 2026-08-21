@@ -55,7 +55,6 @@ def create_chat(
 # LIST CHATS
 # ============================================================
 
-
 @router.get(
     "/",
     response_model=List[ChatResponse],
@@ -82,7 +81,7 @@ def list_chats(
 
 @router.get(
     "/{chat_id}",
-    response_model=ChatDetailResponse,
+    response_model=ChatResponse,
 )
 def get_chat(
     chat_id: int,
@@ -167,17 +166,16 @@ def delete_chat(
     response_model=ChatMessageResponse,
     status_code=status.HTTP_201_CREATED,
 )
-def create_message(
+async def create_message(
     chat_id: int,
     message_in: ChatMessageCreate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
    
-
     service = ChatService(db)
 
-    return service.process_message(
+    return await service.process_message(
         chat_id=chat_id,
         user_id=current_user.id,
         message_in=message_in,

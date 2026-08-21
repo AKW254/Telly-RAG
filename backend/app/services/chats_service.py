@@ -72,16 +72,16 @@ class ChatService:
         return title
     
     #list chat
-    def list_chats(self, user_id: int, ) ->ChatResponse:
+    def list_chats(self, user_id: int, ) -> list[Chat]:
         chats= self.db.query(Chat).filter(Chat.user_id == user_id).order_by(Chat.updated_at).all()
         return chats
     
     # Get Single Chat
-    def get_chat(self,chat_id:int ,user_id:int,) -> ChatDetailResponse:
+    def get_chat(self,chat_id:int ,user_id:int,) -> Chat:
         chat =self.db.query(Chat).options(joinedload(Chat.messages)).filter(Chat.id == chat_id,Chat.user_id == user_id).first()
         return chat
     #Update chat
-    def update_chat(self, chat_id: int, user_id: int,chat_in: ChatUpdate,) -> ChatResponse:
+    def update_chat(self, chat_id: int, user_id: int,chat_in: ChatUpdate,) -> Chat:
         chat = self.get_chat(chat_id=chat_id,user_id=user_id)
         data = chat_in.model_dump(exclude_unset=True)
         
@@ -164,7 +164,7 @@ class ChatService:
     
     
     #Retrival and Generation Pipeline
-    def process_message(self,chat_id: int,user_id: int,message_in: ChatMessageCreate,) -> ChatMessage:
+    async def process_message(self,chat_id: int,user_id: int,message_in: ChatMessageCreate,) -> ChatMessage:
 
     # ==================================================
     # Verify chat ownership
@@ -226,7 +226,7 @@ class ChatService:
     # GENERATION
     # ==================================================
 
-        answer = self.generator.generate(
+        answer = await self.generator.generate(
             question=message_in.content,
             documents=documents,
             chat_history=history,

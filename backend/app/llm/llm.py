@@ -26,7 +26,7 @@ def get_llm() -> BaseChatModel:
         )
 
     return ChatOpenRouter(
-        model=settings.openrouter_model,
+        model=settings.openrouter_model_name,
         api_key=api_key,
         base_url=settings.openrouter_base_url,
         temperature=getattr(
