@@ -44,7 +44,7 @@ class RetrieverService:
     # Retrieve
     # ======================================================
 
-    def retrieve(self,query: str,user_id: int,top_k: int = 5,) -> List[Document]:
+    def retrieve(self,query: str,top_k: int = 5,) -> List[Document]:
 
         if not query.strip():
             return []
@@ -52,6 +52,6 @@ class RetrieverService:
         if top_k <= 0:
             raise ValueError("top_k must be greater than zero")
 
-        results = self.vector_store.similarity_search(query=query,k=top_k,filter={"user_id": str(user_id),},)
+        results = self.vector_store.similarity_search(query=query,k=top_k,)
 
         return results

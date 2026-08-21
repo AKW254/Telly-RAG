@@ -7,7 +7,12 @@ from app.rag.generation.prompts.rag_prompt import RAG_PROMPT
 class GeneratorService:
 
     def __init__(self):
+
         self.llm = get_llm()
+
+    # ======================================================
+    # Format Documents
+    # ======================================================
 
     @staticmethod
     def format_documents(
@@ -23,12 +28,18 @@ class GeneratorService:
             documents,
             start=1,
         ):
+
             metadata = document.metadata or {}
 
-            source = metadata.get(
-                "source",
+            document_id = metadata.get(
+                "document_id",
+                "unknown",
+            )
+
+            filename = metadata.get(
+                "filename",
                 metadata.get(
-                    "filename",
+                    "source",
                     "Unknown source",
                 ),
             )
@@ -36,19 +47,32 @@ class GeneratorService:
             page = metadata.get("page")
 
             if page is not None:
+
                 try:
                     page = int(page) + 1
+
                 except (TypeError, ValueError):
                     pass
 
-                source = f"{source}, page {page}"
+            page_info = ""
+
+            if page is not None:
+                page_info = f"\npage: {page}"
 
             sections.append(
-                f"[Source {index}: {source}]\n"
+                f"[Document {index}]\n"
+                f"document_id: {document_id}\n"
+                f"filename: {filename}"
+                f"{page_info}\n"
+                f"content:\n"
                 f"{document.page_content.strip()}"
             )
 
         return "\n\n".join(sections)
+
+    # ======================================================
+    # Format History
+    # ======================================================
 
     @staticmethod
     def format_history(
@@ -65,6 +89,10 @@ class GeneratorService:
             if message.get("content")
         )
 
+    # ======================================================
+    # Generate
+    # ======================================================
+
     async def generate(
         self,
         question: str,
@@ -74,7 +102,9 @@ class GeneratorService:
 
         prompt = RAG_PROMPT.invoke(
             {
-                "context": self.format_documents(documents),
+                "context": self.format_documents(
+                    documents
+                ),
                 "chat_history": self.format_history(
                     chat_history
                 ),
@@ -84,4 +114,6 @@ class GeneratorService:
 
         response = await self.llm.ainvoke(prompt)
 
-        return str(response.content).strip()
+        return str(
+            response.content
+        ).strip()

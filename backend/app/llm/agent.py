@@ -8,10 +8,9 @@ from app.rag.generation.prompts.agent_prompt import AGENT_PROMPT
 
 
 def build_agent(tools: list) -> AgentExecutor:
-   
-    if tools is None:
-        tools = []
-   
+
+    tools = tools or []
+
     llm = get_llm()
 
     agent = create_openai_tools_agent(
@@ -26,5 +25,5 @@ def build_agent(tools: list) -> AgentExecutor:
         verbose=True,
         max_iterations=10,
         handle_parsing_errors=True,
-        return_intermediate_steps=False,
+        return_intermediate_steps=True,
     )

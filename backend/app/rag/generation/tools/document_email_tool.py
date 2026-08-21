@@ -1,22 +1,28 @@
 from pathlib import Path
+import logging
 
 from langchain_core.tools import StructuredTool
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
+from app.config.settings import settings
 from app.models.documents import Document
 
 
+logger = logging.getLogger(__name__)
+
+
 # ==========================================================
-# Tool Input Schema
+# Tool Input
 # ==========================================================
 
 class DocumentEmailInput(BaseModel):
     document_id: int = Field(
         ...,
         description=(
-            "The ID of the document that the authenticated "
-            "user wants to receive by email."
+            "The internal ID of the document to send. "
+            "This ID must come from the retrieved document context. "
+            "Never invent a document ID."
         ),
     )
 
@@ -27,44 +33,31 @@ class DocumentEmailInput(BaseModel):
 
 def create_document_email_tool(
     db: Session,
-    user_id: int,
+    user_name: str,
     recipient_email: str,
 ) -> StructuredTool:
-    """
-    Creates a document-email tool scoped to the authenticated user.
-
-    The LLM can provide only document_id.
-    user_id and recipient_email come from the application.
-    """
 
     def send_document_by_email(
         document_id: int,
     ) -> str:
-        """
-        Send an authenticated user's document by email.
-        """
 
         # --------------------------------------------------
-        # Find document belonging to authenticated user
+        # Find document
         # --------------------------------------------------
 
         document = (
             db.query(Document)
-            .filter(
-                Document.id == document_id,
-                Document.user_id == user_id,
-            )
+            .filter(Document.id == document_id)
             .first()
         )
 
         if not document:
             return (
-                "The requested document was not found or "
-                "you do not have permission to access it."
+                "The requested document could not be found."
             )
 
         # --------------------------------------------------
-        # Check stored file path
+        # Verify file path
         # --------------------------------------------------
 
         if not document.file_path:
@@ -92,37 +85,70 @@ def create_document_email_tool(
         # --------------------------------------------------
 
         try:
-            # Change this import/method to your existing mailer.
-            from app.services.mailer_service import MailerService
 
-            mailer = MailerService()
+            from app.mailer.mailer import EmailService
 
-            mailer.send_document_email(
-                recipient=recipient_email,
-                document=document,
-                file_path=str(file_path),
+            service = EmailService()
+
+            context = {
+                "user_name": user_name,
+                "app_name": settings.app_name,
+                "document_name": document.filename,
+            }
+
+            service.send_from_template(
+                to_email=recipient_email,
+                subject=(
+                    f"Requested document: "
+                    f"{document.filename}"
+                ),
+                template_name="document.html",
+                context=context,
+                plain_text_template="document.txt",
+                attachments=[
+                    str(file_path),
+                ],
+            )
+
+            logger.info(
+                "Document %s (%s) sent to %s",
+                document.id,
+                document.filename,
+                recipient_email,
             )
 
             return (
                 f"The document '{document.filename}' "
-                f"was successfully sent to {recipient_email}."
+                "has been successfully sent to "
+                f"{recipient_email}."
             )
 
-        except Exception as exc:
-            # Do not expose internal exception details to the LLM.
-            return (
-                f"I was unable to send '{document.filename}' "
-                "right now. Please try again later."
+        except Exception:
+            logger.exception(
+                "Failed to send document %s to %s",
+                document.id,
+                recipient_email,
             )
+
+            return (
+                f"I was unable to send "
+                f"'{document.filename}' right now."
+            )
+
+    # ======================================================
+    # Return LangChain Tool
+    # ======================================================
 
     return StructuredTool.from_function(
         func=send_document_by_email,
         name="send_document_by_email",
         description=(
-            "Send a document belonging to the authenticated user "
-            "to the user's configured email address. "
-            "Use this only when the user explicitly asks to "
-            "receive, email, send, or download a document."
+            "Send a publicly available document to the "
+            "authenticated user's configured email address. "
+            "Use this tool only when the user explicitly asks "
+            "to send, email, or deliver a document. "
+            "The document_id MUST come from the retrieved "
+            "document context. Never invent a document_id."
         ),
         args_schema=DocumentEmailInput,
     )

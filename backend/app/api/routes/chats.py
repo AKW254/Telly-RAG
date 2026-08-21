@@ -172,15 +172,15 @@ async def create_message(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-   
     service = ChatService(db)
 
     return await service.process_message(
         chat_id=chat_id,
         user_id=current_user.id,
+        user_name=current_user.name,
+        user_email=current_user.email,
         message_in=message_in,
     )
-
 
 # ============================================================
 # LIST CHAT MESSAGES

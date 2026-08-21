@@ -1,0 +1,16 @@
+Hi {{ user_name }},
+
+You requested the following document from {{ app_name }}:
+
+{{ document_name }}
+
+The requested document is attached to this email.
+
+If you did not request this document, you can safely ignore this message.
+
+Regards,
+The {{ app_name }} Team
+
+© 2026 {{ app_name }}. All rights reserved.
+
+This is an automated message.
