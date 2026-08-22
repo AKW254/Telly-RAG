@@ -14,9 +14,8 @@ from app.cache.factory import get_cache
 from app.rag.retrieval.RetrieverService import RetrieverService
 from app.llm.agent import build_agent
 
-from app.rag.generation.tools.document_email_tool import (
-    create_document_email_tool,
-)
+from app.rag.generation.tools.document_email_tool import create_document_email_tool
+from app.rag.generation.tools.find_document_tool import create_find_document_tool
 
 
 class ChatService:
@@ -439,13 +438,16 @@ class ChatService:
             context = (
                 "No relevant documents were retrieved."
             )
+        # ------------------------------------------------------
+        # 7. Find document(s) tool
+        # ------------------------------------------------------
+        find_documents_tool = create_find_document_tool(db=self.db)
 
         # ------------------------------------------------------
         # 7. Create authorized email tool
         # ------------------------------------------------------
 
-        document_email_tool = (
-            create_document_email_tool(
+        document_email_tool = (create_document_email_tool(
                 db=self.db,
                 user_name=user_name,
                 recipient_email=user_email,
@@ -458,6 +460,7 @@ class ChatService:
 
         agent = build_agent(
             tools=[
+                find_documents_tool,
                 document_email_tool,
             ]
         )
