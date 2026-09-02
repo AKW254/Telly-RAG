@@ -1,19 +1,23 @@
-import { Outlet } from "react-router-dom"
+import { Outlet } from "react-router-dom";
+import Sidebar from "./Sidebar";
+import Navigationbar from "./Navigationbar";
 
-function Layout(){
-    return (
-      <div className="min-h-screen bg-gray-50">
-        {/* Header */}
-        <header className="border-b bg-white">
-          <div className="w-full px-4 sm:px-6 lg:px-8">{/* Navbar */}</div>
-        </header>
+function Layout() {
+  return (
+    <div className="flex h-screen w-screen flex-col overflow-hidden bg-gray-50">
+      {/* Top navigation */}
+      <Navigationbar />
 
-        {/* Main content */}
-        <main className="w-full px-4 sm:px-6 lg:px-8">
+      {/* Sidebar + Content */}
+      <div className="flex min-h-0 flex-1">
+        <Sidebar />
+
+        <main className="flex min-w-0 flex-1 flex-col overflow-hidden">
           <Outlet />
         </main>
       </div>
-    );
-
+    </div>
+  );
 }
+
 export default Layout;

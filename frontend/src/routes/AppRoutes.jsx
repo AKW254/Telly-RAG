@@ -20,17 +20,22 @@ function AppRoutes() {
       }
     >
       <Routes>
-        <Route element={<Layout />}>
+        <Route>
           {/* Public Routes */}
           <Route path="/" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
 
           {/* Protected Routes using Outlet nesting */}
           <Route element={<ProtectedRoute />}>
+           <Route element={<Layout />}>
+            {/* Chat without ID */}
+            <Route path="/chat" element={<ChatPage />} />
+            {/* Chat with ID */}
+            <Route path="/chat/:id" element={<ChatPage />} />
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="/document" element={<DocumentPage />} />
-            <Route path="/chat" element={<ChatPage />} />
           </Route>
+        </Route>
         </Route>
       </Routes>
     </Suspense>
