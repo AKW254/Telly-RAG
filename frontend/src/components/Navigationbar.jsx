@@ -14,17 +14,16 @@ import {
   User,
   FileText,
   LogOut,
-  Bell,
   Menu as Bars3Icon,
   X as XMarkIcon,
 } from "lucide-react";
 
-import useAuth from "../hooks/useAuth";
+
 
 const navigation = [
   {
     name: "Dashboard",
-    href: "/dashboard",
+    href: "/chat",
     icon: LayoutDashboard,
   },
   {
@@ -39,8 +38,11 @@ const navigation = [
   },
 ];
 
+import useAuth from "../hooks/useAuth";
+ 
+
 function Navigationbar() {
-  const { logout, user } = useAuth();
+  const { user, logout} = useAuth(); 
 
   return (
     <Disclosure
@@ -54,7 +56,6 @@ function Navigationbar() {
     >
       <div className="mx-auto w-full px-4 sm:px-6 lg:px-8">
         <div className="flex h-16 items-center justify-between">
-
           {/* Mobile / Tablet Menu Button */}
           <div className="flex items-center lg:hidden">
             <DisclosureButton
@@ -69,9 +70,7 @@ function Navigationbar() {
                 focus:ring-indigo-500
               "
             >
-              <span className="sr-only">
-                Open main menu
-              </span>
+              <span className="sr-only">Open main menu</span>
 
               <Bars3Icon
                 aria-hidden="true"
@@ -87,10 +86,7 @@ function Navigationbar() {
 
           {/* Logo */}
           <div className="flex items-center lg:hidden">
-            <NavLink
-              to="/dashboard"
-              className="flex items-center gap-2"
-            >
+            <NavLink to="/chat" className="flex items-center gap-2">
               <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-indigo-600">
                 <FileText className="h-5 w-5 text-white" />
               </div>
@@ -110,7 +106,6 @@ function Navigationbar() {
               <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-indigo-600">
                 <FileText className="h-5 w-5 text-white" />
               </div>
-
               Telly RAG
             </NavLink>
 
@@ -131,7 +126,7 @@ function Navigationbar() {
                       ${
                         isActive
                           ? "bg-indigo-50 text-indigo-600"
-                          : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+                          : "text-gray-600 hover:bg-gray-50 hover:text-indigo-500"
                       }
                       `
                     }
@@ -146,9 +141,6 @@ function Navigationbar() {
 
           {/* Right Side */}
           <div className="flex items-center gap-2 sm:gap-4">
-
-           
-
             {/* User Menu */}
             <Menu as="div" className="relative">
               <MenuButton
@@ -162,10 +154,9 @@ function Navigationbar() {
               >
                 <img
                   alt="User profile"
-                  src={
-                    user?.avatar ||
-                    "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&h=100&fit=crop"
-                  }
+                  src=
+                    "https://images.unsplash.com/vector-1742875355318-00d715aec3e8?q=80&w=580&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&fit=crop"
+                  
                   className="
                     h-8 w-8
                     rounded-full
@@ -175,7 +166,7 @@ function Navigationbar() {
                 />
 
                 <span className="hidden text-sm font-medium text-gray-700 md:block">
-                  {user?.name || "User"}
+                  {user?.name}
                 </span>
               </MenuButton>
 

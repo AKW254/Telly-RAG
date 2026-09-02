@@ -3,6 +3,8 @@ import re
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session, joinedload
 
+from app.config.settings import settings
+
 from app.models.chats import Chat
 from app.models.chatmessages import ChatMessage
 from app.schemas.chats_schema import ChatCreate, ChatUpdate
@@ -12,7 +14,9 @@ from app.cache.chat_cache import ChatCache
 from app.cache.factory import get_cache
 
 from app.rag.retrieval.RetrieverService import RetrieverService
+
 from app.llm.agent import build_agent
+from app.llm.request_resolver import resolve_request
 
 from app.rag.generation.tools.document_email_tool import create_document_email_tool
 from app.rag.generation.tools.find_document_tool import create_find_document_tool
@@ -332,7 +336,7 @@ class ChatService:
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Chat not found",
             )
-
+        current_message = message_in.content.strip()
         # ------------------------------------------------------
         # 2. Get PREVIOUS conversation history
         # ------------------------------------------------------
@@ -341,7 +345,8 @@ class ChatService:
             chat_id=chat_id,
             user_id=user_id,
         )
-
+        # Only recent history is used by the resolver.
+        recent_history = history[-6:]
         # ------------------------------------------------------
         # 3. Save user message
         # ------------------------------------------------------
@@ -349,12 +354,12 @@ class ChatService:
         user_message = ChatMessage(
             chat_id=chat_id,
             role="user",
-            content=message_in.content,
+            content=current_message,
         )
 
         if not chat.title or not chat.title.strip():
             chat.title = self._title_from_message(
-                message_in.content
+                current_message
             )
 
         self.db.add(user_message)
@@ -369,20 +374,36 @@ class ChatService:
             user_id=user_id,
             chat_id=chat_id,
             role="user",
-            content=message_in.content,
+            content=current_message,
         )
+        # ==========================================================
+        # 5. RESOLVE REQUEST
+        # ==========================================================
+
+        request_context = await resolve_request(
+            current_message=current_message,
+            history=recent_history,
+            )
+
+        if settings.debug:
+            print("\n========== REQUEST CONTEXT ==========")
+            print(request_context.model_dump_json(indent=2))
+            print("=====================================\n")
+            
+        # ------------------------------------------------------
+        # 6. RETRIEVAL
+        # ------------------------------------------------------
+        
+        documents = []
+        if  request_context.needs_document:
+            retrieval_query = (
+                request_context.document_query or request_context.current_query
+            )
+            documents = self.retriever.retriever(query=retrieval_query,top_k=5,)
+        
 
         # ------------------------------------------------------
-        # 5. RETRIEVAL
-        # ------------------------------------------------------
-
-        documents = self.retriever.retrieve(
-            query=message_in.content,
-            top_k=5,
-        )
-
-        # ------------------------------------------------------
-        # 6. Build document context for agent
+        # 7. Build document context for agent
         # ------------------------------------------------------
 
         context_parts = []
@@ -439,12 +460,12 @@ class ChatService:
                 "No relevant documents were retrieved."
             )
         # ------------------------------------------------------
-        # 7. Find document(s) tool
+        # 8. Find document(s) tool
         # ------------------------------------------------------
         find_documents_tool = create_find_document_tool(db=self.db)
 
         # ------------------------------------------------------
-        # 7. Create authorized email tool
+        # 9. Create authorized email tool
         # ------------------------------------------------------
 
         document_email_tool = (create_document_email_tool(
@@ -455,7 +476,7 @@ class ChatService:
         )
 
         # ------------------------------------------------------
-        # 8. Build agent with tools
+        # 9. Build agent with tools
         # ------------------------------------------------------
 
         agent = build_agent(
@@ -466,14 +487,14 @@ class ChatService:
         )
 
         # ------------------------------------------------------
-        # 9. Run agent
+        # 10. Run agent
         # ------------------------------------------------------
 
-        result = await agent.ainvoke(
+        result = await  agent.ainvoke(
             {
                 "input": message_in.content,
+                "request_context": request_context.model_dump_json(indent=2),
                 "context": context,
-                "chat_history": history,
                 "user_context": (
                     f"Authenticated user: {user_name}\n"
                     f"Email: {user_email}\n"
@@ -482,13 +503,16 @@ class ChatService:
             }
         )
 
+        # ==========================================================
+        # 11. RESPONSE
+        # ==========================================================
         answer = result.get(
             "output",
             "I was unable to generate a response.",
         )
 
         # ------------------------------------------------------
-        # 10. Save assistant response
+        # 12. Save assistant response
         # ------------------------------------------------------
 
         return self.create_assistant_message(

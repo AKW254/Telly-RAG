@@ -27,15 +27,26 @@ function readStoredToken() {
 export function AuthProvider({ children }) {
   const initialToken = readStoredToken();
   const [token, setToken] = useState(initialToken);
-  const [user, setUser] = useState(() =>
+  const [user, setUserState] = useState(() =>
     initialToken ? readStoredUser() : null,
   );
+
+  // Keeps localStorage in sync, same as `login` already does —
+  // so a refresh after a profile edit doesn't revert to stale data
+  const setUser = useCallback((userData) => {
+    setUserState(userData);
+    if (userData) {
+      localStorage.setItem("user", JSON.stringify(userData));
+    } else {
+      localStorage.removeItem("user");
+    }
+  }, []);
 
   const logout = useCallback(() => {
     localStorage.removeItem("token");
     localStorage.removeItem("user");
     setToken(null);
-    setUser(null);
+    setUserState(null);
   }, []);
 
   const login = useCallback(
@@ -47,7 +58,7 @@ export function AuthProvider({ children }) {
       localStorage.setItem("token", accessToken);
       localStorage.setItem("user", JSON.stringify(userData));
       setToken(accessToken);
-      setUser(userData);
+      setUserState(userData);
     },
     [logout],
   );
@@ -76,7 +87,7 @@ export function AuthProvider({ children }) {
 
   return (
     <AuthContext.Provider
-      value={{ user, token, login, logout, isAuthenticated }}
+      value={{ user, token, login, logout, isAuthenticated, setUser }}
     >
       {children}
     </AuthContext.Provider>
