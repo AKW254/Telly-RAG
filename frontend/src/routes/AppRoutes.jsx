@@ -33,7 +33,7 @@ function AppRoutes() {
             {/* Chat with ID */}
             <Route path="/chat/:id" element={<ChatPage />} />
             <Route path="/profile" element={<ProfilePage />} />
-            <Route path="/document" element={<DocumentPage />} />
+            <Route path="/documents" element={<DocumentPage />} />
           </Route>
         </Route>
         </Route>
