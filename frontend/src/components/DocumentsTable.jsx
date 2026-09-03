@@ -7,19 +7,29 @@ import {
   Eye,
   Pencil,
   Trash2,
+  Plus,
 } from "lucide-react";
+import AddDocumentModal from "./AddDocumentModal";
 
 export default function DocumentsTable({
   documents = [],
   onViewDocument,
   onDeleteDocument,
   onUpdateDocument,
+  onAddDocument,
 }) {
   const [globalFilter, setGlobalFilter] = useState("");
   const [sortField, setSortField] = useState(null);
   const [sortDirection, setSortDirection] = useState("asc");
   const [pageIndex, setPageIndex] = useState(0);
   const [pageSize, setPageSize] = useState(10);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
+  const handleAddDocument = async (formData) => {
+    if (onAddDocument) {
+      await onAddDocument(formData);
+    }
+  };
 
   const handleSort = (field) => {
     if (sortField === field) {
@@ -85,9 +95,18 @@ export default function DocumentsTable({
     <div className="w-full rounded-lg border border-gray-200 bg-white shadow-sm">
       {/* Header & Search Bar */}
       <div className="flex flex-col gap-4 border-b border-gray-200 p-6 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h2 className="text-lg font-semibold text-gray-900">Add New Document</h2>
-         
+        <div className="flex items-center gap-4">
+          <div>
+            <h2 className="text-lg font-semibold text-gray-900">Documents</h2>
+            <p className="text-sm text-gray-500">Manage your documents</p>
+          </div>
+          <button
+            onClick={() => setIsModalOpen(true)}
+            className="ml-auto flex items-center gap-2 rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-indigo-700 sm:ml-0"
+          >
+            <Plus size={18} />
+            Add Document
+          </button>
         </div>
         <div className="relative w-full sm:w-72">
           <Search
@@ -288,6 +307,13 @@ export default function DocumentsTable({
           </button>
         </div>
       </div>
+
+      {/* Add Document Modal */}
+      <AddDocumentModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onSubmit={handleAddDocument}
+      />
     </div>
   );
 }
