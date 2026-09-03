@@ -1,140 +1,61 @@
+
 import { useState } from "react";
 import { X, Upload } from "lucide-react";
 
-function AddDocumentModal({ isOpen, onClose, onSubmit }) {
-  const [formData, setFormData] = useState({
-    name: "",
-    type: "pdf",
-    file: null,
-    description: "",
-  });
+function AddDocumentModal({
+  isOpen,
+  onClose,
+  handleSubmit,
+  register,
+  errors,
+  isSubmitting,
+  onAddDocument,
+}) {
+  const [filePreview, setFilePreview] = useState("");
 
-  const [filePreview, setFilePreview] = useState(null);
-  const [isLoading, setIsLoading] = useState(false);
-
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
-  };
-
+  // Handle file input change
   const handleFileChange = (e) => {
     const file = e.target.files?.[0];
+
     if (file) {
-      setFormData((prev) => ({
-        ...prev,
-        file: file,
-      }));
       setFilePreview(file.name);
+    } else {
+      setFilePreview("");
     }
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-
-    if (!formData.name.trim()) {
-      alert("Please enter a document name");
-      return;
-    }
-
-    if (!formData.file) {
-      alert("Please select a file");
-      return;
-    }
-
-    setIsLoading(true);
-
-    try {
-      await onSubmit(formData);
-      resetForm();
-      onClose();
-    } catch (error) {
-      console.error("Error adding document:", error);
-      alert("Failed to add document. Please try again.");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const resetForm = () => {
-    setFormData({
-      name: "",
-      type: "pdf",
-      file: null,
-      description: "",
-    });
-    setFilePreview(null);
   };
 
   const handleCancel = () => {
-    resetForm();
+    setFilePreview("");
     onClose();
   };
 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
       {/* Modal Container */}
       <div className="w-full max-w-md rounded-lg bg-white shadow-xl">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
           <h3 className="text-lg font-semibold text-gray-900">Add Document</h3>
+
           <button
             type="button"
             onClick={handleCancel}
-            className="text-gray-400 transition hover:text-gray-600"
+            disabled={isSubmitting}
+            className="text-gray-400 transition hover:text-gray-600 disabled:cursor-not-allowed disabled:opacity-50"
           >
             <X size={20} />
           </button>
         </div>
 
         {/* Body */}
-        <form onSubmit={handleSubmit} className="space-y-4 px-6 py-4">
-          {/* Document Name */}
-          <div>
-            <label
-              htmlFor="name"
-              className="block text-sm font-medium text-gray-700"
-            >
-              Document Name <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="text"
-              id="name"
-              name="name"
-              value={formData.name}
-              onChange={handleInputChange}
-              placeholder="Enter document name"
-              className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
-            />
-          </div>
-
-          {/* Document Type */}
-          <div>
-            <label
-              htmlFor="type"
-              className="block text-sm font-medium text-gray-700"
-            >
-              Document Type
-            </label>
-            <select
-              id="type"
-              name="type"
-              value={formData.type}
-              onChange={handleInputChange}
-              className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
-            >
-              <option value="pdf">PDF</option>
-              <option value="docx">DOCX</option>
-              <option value="txt">TXT</option>
-              <option value="markdown">Markdown</option>
-              <option value="other">Other</option>
-            </select>
-          </div>
-
+        <form
+          onSubmit={handleSubmit(onAddDocument)}
+          method="POST"
+          
+          className="space-y-4 px-6 py-5"
+        >
           {/* File Upload */}
           <div>
             <label
@@ -143,70 +64,119 @@ function AddDocumentModal({ isOpen, onClose, onSubmit }) {
             >
               Upload File <span className="text-red-500">*</span>
             </label>
-            <div className="mt-1 flex items-center gap-3">
+
+            <div className="mt-2">
               <label
                 htmlFor="file"
-                className="flex cursor-pointer items-center gap-2 rounded-md border-2 border-dashed border-gray-300 px-4 py-3 transition hover:border-indigo-500 hover:bg-indigo-50"
+                className="flex cursor-pointer items-center justify-center gap-2 rounded-md border-2 border-dashed border-gray-300 px-4 py-4 transition hover:border-indigo-500 hover:bg-indigo-50"
               >
                 <Upload size={18} className="text-gray-400" />
-                <span className="text-sm text-gray-600">Choose file</span>
-              </label>
-              <input
-                type="file"
-                id="file"
-                onChange={handleFileChange}
-                className="hidden"
-              />
-              {filePreview && (
-                <span className="text-sm font-medium text-green-600">
-                  {filePreview}
+
+                <span className="text-sm font-medium text-gray-600">
+                  Choose file
                 </span>
+              </label>
+
+              <input
+                id="file"
+                type="file"
+                className="sr-only"
+                accept=".pdf,.docx,.txt,.md"
+                {...register("file", {
+                  required: "File is required",
+                  validate: {
+                    lessThan10MB: (files) =>
+                      !files?.[0] ||
+                      files[0].size <= 10 * 1024 * 1024 ||
+                      "Maximum file size is 10MB",
+
+                    acceptedFormats: (files) => {
+                      if (!files?.[0]) return true;
+
+                      const allowedTypes = [
+                        "text/plain",
+                        "text/markdown",
+                        "application/pdf",
+                        "application/msword",
+                        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                      ];
+
+                      return (
+                        allowedTypes.includes(files[0].type) ||
+                        "Only PDF, DOCX, TXT, or MD files are allowed"
+                      );
+                    },
+                  },
+                })}
+                onChange={(event) => {
+                  handleFileChange(event);
+
+                  // Preserve React Hook Form's onChange
+                  register("file").onChange(event);
+                }}
+              />
+
+              {/* Selected File */}
+              {filePreview && (
+                <div className="mt-2 rounded-md bg-green-50 px-3 py-2">
+                  <p className="truncate text-sm font-medium text-green-700">
+                    {filePreview}
+                  </p>
+                </div>
+              )}
+
+              {/* Validation Error */}
+              {errors?.file?.message && (
+                <p className="mt-2 text-sm text-red-600">
+                  {errors.file.message}
+                </p>
               )}
             </div>
           </div>
 
-          {/* Description */}
-          <div>
-            <label
-              htmlFor="description"
-              className="block text-sm font-medium text-gray-700"
+          {/* Footer */}
+          <div className="border-t border-gray-100 pt-4">
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              aria-busy={isSubmitting}
+              className="flex w-full justify-center rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-indigo-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              Description
-            </label>
-            <textarea
-              id="description"
-              name="description"
-              value={formData.description}
-              onChange={handleInputChange}
-              placeholder="Enter document description (optional)"
-              rows="3"
-              className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
-            />
+              {isSubmitting ? (
+                <span className="inline-flex items-center justify-center gap-2">
+                  <svg
+                    className="h-4 w-4 animate-spin"
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                  >
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                    />
+
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                    />
+                  </svg>
+                  Uploading...
+                </span>
+              ) : (
+                "Upload Document"
+              )}
+            </button>
           </div>
         </form>
-
-        {/* Footer */}
-        <div className="flex gap-3 border-t border-gray-200 px-6 py-4">
-          <button
-            type="button"
-            onClick={handleCancel}
-            disabled={isLoading}
-            className="flex-1 rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            Cancel
-          </button>
-          <button
-            type="submit"
-            onClick={handleSubmit}
-            disabled={isLoading}
-            className="flex-1 rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {isLoading ? "Adding..." : "Add Document"}
-          </button>
-        </div>
       </div>
     </div>
   );
 }
 
 export default AddDocumentModal;
+

@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import List, Optional
 from pydantic import BaseModel, ConfigDict, Field
-
+from .users_schema import UserResponse
 
 # ==========================================
 # Document Schemas
@@ -38,5 +38,5 @@ class DocumentResponse(DocumentBase):
     status: str
     created_at: datetime
     updated_at: datetime
-
+    user: Optional[UserResponse] = None
     model_config = ConfigDict(from_attributes=True)

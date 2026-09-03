@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { NavLink } from "react-router-dom";
 import {
   LayoutDashboard,
@@ -9,8 +10,10 @@ import {
 } from "lucide-react";
 
 import useAuth from "../hooks/useAuth";
+import { getDocuments } from "../services/documentService";
 
 function Sidebar() {
+  const [documents, setDocuments] = useState([]);
   const { logout } = useAuth();
 
   const navLinks = [
@@ -30,6 +33,23 @@ function Sidebar() {
       label: "Documents",
     },
   ];
+
+  const fetchDocuments = async () => {
+    try {
+      const response = await getDocuments();
+      setDocuments(Array.isArray(response) ? response : []);
+    } catch (error) {
+      console.error("Error fetching documents:", error);
+    }
+  };
+
+  useEffect(() => {
+    fetchDocuments();
+
+    window.addEventListener("documents-updated", fetchDocuments);
+    return () =>
+      window.removeEventListener("documents-updated", fetchDocuments);
+  }, []);
 
   return (
     <aside className="hidden w-64 shrink-0 flex-col border-r border-gray-200 bg-white md:flex">
@@ -116,25 +136,22 @@ function Sidebar() {
         {/* Documents */}
         <div className="mt-8">
           <p className="mb-2 px-3 text-xs font-semibold uppercase tracking-wider text-gray-400">
-            Recent Documents
+            Available Documents
           </p>
 
           <div className="space-y-1">
-            <NavLink
-              to="/documents/1"
-              className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-gray-600 hover:bg-gray-50 hover:text-gray-900"
-            >
-              <FileText className="h-4 w-4 text-gray-400" />
-              <span className="truncate">My CV.pdf</span>
-            </NavLink>
-
-            <NavLink
-              to="/documents/2"
-              className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-gray-600 hover:bg-gray-50 hover:text-gray-900"
-            >
-              <FileText className="h-4 w-4 text-gray-400" />
-              <span className="truncate">Cover Letter.pdf</span>
-            </NavLink>
+            <ol>
+            {documents?.map((document) => (
+              <li
+                key={document.id}
+                to="/documents"
+                className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+              >
+                <FileText className="h-4 w-4 text-gray-400" />
+                <span className="truncate">{document.filename}</span>
+              </li>
+            ))}
+            </ol>
           </div>
         </div>
       </div>

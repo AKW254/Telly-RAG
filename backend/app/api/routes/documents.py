@@ -1,12 +1,15 @@
+from pathlib import Path
 from typing import List
 
 from fastapi import (
     APIRouter,
     Depends,
     File,
+    HTTPException,
     UploadFile,
     status,
 )
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from app.api.dependencies import get_current_user
@@ -39,19 +42,41 @@ async def upload_document(
 
 
 @router.get(
+    "/{document_id}/download",
+    response_class=FileResponse,
+)
+def download_document(
+    document_id: int,
+    db: Session = Depends(get_db),
+) -> FileResponse:
+    service = DocumentsService(db)
+    document = service.get_document(document_id=document_id)
+
+    if not document.file_path or not Path(document.file_path).is_file():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Document file not found",
+        )
+
+    return FileResponse(
+        path=document.file_path,
+        media_type=document.mime_type or "application/octet-stream",
+        filename=document.filename,
+    )
+
+
+@router.get(
     "/",
     response_model=List[DocumentResponse],
 )
 def list_documents(
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+   
 ) -> List[DocumentResponse]:
 
     service = DocumentsService(db)
 
-    return service.list_documents(
-        current_user.id
-    )
+    return service.list_documents()
 
 
 @router.get(
@@ -61,14 +86,14 @@ def list_documents(
 def get_document(
     document_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    
 ) -> DocumentResponse:
 
     service = DocumentsService(db)
 
     return service.get_document(
         document_id=document_id,
-        user_id=current_user.id,
+       
     )
 
 
@@ -82,7 +107,7 @@ async def update_document(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> DocumentResponse:
-    """Replace a document source file and re-ingest its embeddings."""
+
 
     service = DocumentsService(db)
     return await service.update_document(

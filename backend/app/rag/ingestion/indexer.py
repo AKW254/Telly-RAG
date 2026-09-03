@@ -16,15 +16,7 @@ class DocumentIndexer:
         # Embeddings
         # --------------------------------------------------
 
-        self.embeddings = HuggingFaceEmbeddings(
-            model_name="sentence-transformers/all-MiniLM-L6-v2",
-            model_kwargs={
-                "device": "cpu",
-            },
-            encode_kwargs={
-                "normalize_embeddings": True,
-            },
-        )
+        self._embeddings = None
 
         # --------------------------------------------------
         # Chroma persistence
@@ -43,6 +35,21 @@ class DocumentIndexer:
             exist_ok=True,
         )
 
+    @property
+    def embeddings(self):
+        if self._embeddings is None:
+            self._embeddings = HuggingFaceEmbeddings(
+                model_name="sentence-transformers/all-MiniLM-L6-v2",
+                model_kwargs={
+                    "device": "cpu",
+                },
+                encode_kwargs={
+                    "normalize_embeddings": True,
+                },
+            )
+
+        return self._embeddings
+
     # ======================================================
     # Vector Store
     # ======================================================
@@ -50,15 +57,18 @@ class DocumentIndexer:
     def get_vector_store(
         self,
         collection_name: str = "telly_documents",
+        include_embeddings: bool = True,
     ) -> Chroma:
 
-        return Chroma(
-            collection_name=collection_name,
-            embedding_function=self.embeddings,
-            persist_directory=str(
-                self.persist_directory
-            ),
-        )
+        vector_store_options = {
+            "collection_name": collection_name,
+            "persist_directory": str(self.persist_directory),
+        }
+
+        if include_embeddings:
+            vector_store_options["embedding_function"] = self.embeddings
+
+        return Chroma(**vector_store_options)
 
     # ======================================================
     # Index
@@ -123,7 +133,7 @@ class DocumentIndexer:
         document_id: int,
     ) -> None:
 
-        vector_store = self.get_vector_store()
+        vector_store = self.get_vector_store(include_embeddings=False)
 
         vector_store._collection.delete(
             where={

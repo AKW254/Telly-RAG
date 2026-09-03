@@ -21,6 +21,7 @@ def process_document_task(
     self,
     document_id: int,
     expected_file_path: str | None = None,
+    
 ) -> bool:
 
     db = SessionLocal()
@@ -91,6 +92,7 @@ def process_document_task(
         ingestion_service.process_document(
             file_path=str(file_path),
             document_id=document.id,
+            filename=document.filename,
             user_id=document.user_id,
         )
 

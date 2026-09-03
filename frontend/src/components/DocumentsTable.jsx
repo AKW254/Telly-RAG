@@ -9,7 +9,11 @@ import {
   Trash2,
   Plus,
 } from "lucide-react";
+
 import AddDocumentModal from "./AddDocumentModal";
+import DeleteDocumentModal from "./DeleteDocumentModal";
+import EditDocumentModal from "./EditDocumentModal";
+import ViewDocumentModal from "./ViewDocumentModal";
 
 export default function DocumentsTable({
   documents = [],
@@ -17,6 +21,19 @@ export default function DocumentsTable({
   onDeleteDocument,
   onUpdateDocument,
   onAddDocument,
+  handleSubmit,
+  register,
+  errors,
+  isSubmitting,
+  registerEdit,
+  handleEditSubmit,
+  editErrors,
+  isEditing,
+  resetEdit,
+  handleDeleteSubmit,
+  isDeleting,
+  resetDelete,
+  currentUser,
 }) {
   const [globalFilter, setGlobalFilter] = useState("");
   const [sortField, setSortField] = useState(null);
@@ -24,12 +41,10 @@ export default function DocumentsTable({
   const [pageIndex, setPageIndex] = useState(0);
   const [pageSize, setPageSize] = useState(10);
   const [isModalOpen, setIsModalOpen] = useState(false);
-
-  const handleAddDocument = async (formData) => {
-    if (onAddDocument) {
-      await onAddDocument(formData);
-    }
-  };
+  const [isViewModalOpen, setIsViewModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [selectedDocument, setSelectedDocument] = useState(null);
 
   const handleSort = (field) => {
     if (sortField === field) {
@@ -47,12 +62,14 @@ export default function DocumentsTable({
 
   const filteredDocuments = useMemo(() => {
     if (!globalFilter.trim()) return documents;
+
     const query = globalFilter.toLowerCase();
+
     return documents.filter((doc) => {
       return (
-        (doc.name && doc.name.toLowerCase().includes(query)) ||
-        (doc.type && doc.type.toLowerCase().includes(query)) ||
-        (doc.owner && doc.owner.toLowerCase().includes(query))
+        doc.filename?.toLowerCase().includes(query) ||
+        doc.file_type?.toLowerCase().includes(query) ||
+        doc.user?.name?.toLowerCase().includes(query)
       );
     });
   }, [documents, globalFilter]);
@@ -91,15 +108,42 @@ export default function DocumentsTable({
   const startItem = sortedDocuments.length === 0 ? 0 : pageIndex * pageSize + 1;
   const endItem = Math.min((pageIndex + 1) * pageSize, sortedDocuments.length);
 
+  const handleAddDocument = async (data) => {
+    await onAddDocument?.(data);
+    setIsModalOpen(false);
+  };
+
+  const handleUpdateDocument = async (document, file) => {
+    await onUpdateDocument?.(document, file);
+    resetEdit?.();
+    setIsEditModalOpen(false);
+    setSelectedDocument(null);
+  };
+
+  const handleDeleteDocument = async (document) => {
+    await onDeleteDocument?.(document);
+    resetDelete?.();
+    setIsDeleteModalOpen(false);
+    setSelectedDocument(null);
+  };
+
+  const closeEditModal = () => {
+    resetEdit?.();
+    setIsEditModalOpen(false);
+    setSelectedDocument(null);
+  };
+
+  const closeDeleteModal = () => {
+    resetDelete?.();
+    setIsDeleteModalOpen(false);
+    setSelectedDocument(null);
+  };
+
   return (
     <div className="w-full rounded-lg border border-gray-200 bg-white shadow-sm">
       {/* Header & Search Bar */}
       <div className="flex flex-col gap-4 border-b border-gray-200 p-6 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-4">
-          <div>
-            <h2 className="text-lg font-semibold text-gray-900">Documents</h2>
-            <p className="text-sm text-gray-500">Manage your documents</p>
-          </div>
           <button
             onClick={() => setIsModalOpen(true)}
             className="ml-auto flex items-center gap-2 rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-indigo-700 sm:ml-0"
@@ -132,11 +176,11 @@ export default function DocumentsTable({
           <thead className="bg-gray-50">
             <tr>
               {[
-                { key: "name", label: "Document Name", sortable: true },
-                { key: "type", label: "Type", sortable: true },
+                { key: "filename", label: "Document Name", sortable: true },
+                { key: "file_type", label: "Type", sortable: true },
                 { key: "owner", label: "Owner", sortable: true },
-                { key: "createdAt", label: "Created At", sortable: true },
-                { key: "updatedAt", label: "Updated At", sortable: true },
+                { key: "created_at", label: "Created At", sortable: true },
+                { key: "updated_at", label: "Updated At", sortable: true },
                 { key: "actions", label: "Actions", sortable: false },
               ].map((column) => {
                 const isSorted = sortField === column.key;
@@ -181,53 +225,73 @@ export default function DocumentsTable({
                 >
                   <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-600">
                     <div className="font-medium text-gray-900">
-                      {doc.name || "—"}
+                      {doc.filename || "—"}
                     </div>
                   </td>
+
                   <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-600">
                     <span className="inline-flex rounded-full bg-indigo-50 px-2.5 py-1 text-xs font-medium text-indigo-700">
-                      {doc.type || "—"}
+                      {doc.file_type || "—"}
                     </span>
                   </td>
+
                   <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-600">
-                    {doc.owner || "—"}
+                    {doc.user?.name || "—"}
                   </td>
+
                   <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-600">
-                    {doc.createdAt
-                      ? new Date(doc.createdAt).toLocaleDateString()
+                    {doc.created_at
+                      ? new Date(doc.created_at).toLocaleDateString()
                       : "—"}
                   </td>
+
                   <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-600">
-                    {doc.updatedAt
-                      ? new Date(doc.updatedAt).toLocaleDateString()
+                    {doc.updated_at
+                      ? new Date(doc.updated_at).toLocaleDateString()
                       : "—"}
                   </td>
+
                   <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-600">
                     <div className="flex items-center gap-2">
+                      {/* actions */}
                       <button
                         type="button"
-                        onClick={() => onViewDocument?.(doc)}
+                        onClick={() => {
+                          setSelectedDocument(doc);
+                          onViewDocument?.(doc);
+                          setIsViewModalOpen(true);
+                        }}
                         title="View document"
                         className="rounded-md p-2 text-gray-500 transition hover:bg-indigo-50 hover:text-indigo-600"
                       >
                         <Eye size={17} />
                       </button>
-                      <button
-                        type="button"
-                        onClick={() => onUpdateDocument?.(doc)}
-                        title="Update document"
-                        className="rounded-md p-2 text-gray-500 transition hover:bg-blue-50 hover:text-blue-600"
-                      >
-                        <Pencil size={17} />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => onDeleteDocument?.(doc)}
-                        title="Delete document"
-                        className="rounded-md p-2 text-gray-500 transition hover:bg-red-50 hover:text-red-600"
-                      >
-                        <Trash2 size={17} />
-                      </button>
+                      {doc.user?.id === currentUser?.id && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedDocument(doc);
+                              setIsEditModalOpen(true);
+                            }}
+                            title="Update document"
+                            className="rounded-md p-2 text-gray-500 transition hover:bg-blue-50 hover:text-blue-600"
+                          >
+                            <Pencil size={17} />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedDocument(doc);
+                              setIsDeleteModalOpen(true);
+                            }}
+                            title="Delete document"
+                            className="rounded-md p-2 text-gray-500 transition hover:bg-red-50 hover:text-red-600"
+                          >
+                            <Trash2 size={17} />
+                          </button>
+                        </>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -312,7 +376,37 @@ export default function DocumentsTable({
       <AddDocumentModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        onSubmit={handleAddDocument}
+        onAddDocument={handleAddDocument}
+        handleSubmit={handleSubmit}
+        register={register}
+        errors={errors}
+        isSubmitting={isSubmitting}
+      />
+      <ViewDocumentModal
+        isOpen={isViewModalOpen}
+        document={selectedDocument}
+        onClose={() => {
+          setIsViewModalOpen(false);
+          setSelectedDocument(null);
+        }}
+      />
+      <EditDocumentModal
+        isOpen={isEditModalOpen}
+        document={selectedDocument}
+        onClose={closeEditModal}
+        onUpdateDocument={handleUpdateDocument}
+        handleSubmit={handleEditSubmit}
+        register={registerEdit}
+        errors={editErrors}
+        isSubmitting={isEditing}
+      />
+      <DeleteDocumentModal
+        isOpen={isDeleteModalOpen}
+        document={selectedDocument}
+        onClose={closeDeleteModal}
+        onDeleteDocument={handleDeleteDocument}
+        handleSubmit={handleDeleteSubmit}
+        isSubmitting={isDeleting}
       />
     </div>
   );

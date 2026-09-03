@@ -1,8 +1,9 @@
 from pathlib import Path
+from typing import Optional
 from uuid import uuid4
 
 from fastapi import HTTPException, UploadFile, status
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.config.settings import settings
 from app.models.documents import Document
@@ -167,14 +168,11 @@ class DocumentsService:
 
     def list_documents(
         self,
-        user_id: int,
+      
     ) -> list[Document]:
 
         return (
-            self.db.query(Document)
-            .filter(
-                Document.user_id == user_id
-            )
+            self.db.query(Document).options(joinedload(Document.user))
             .order_by(
                 Document.created_at.desc()
             )
@@ -188,17 +186,21 @@ class DocumentsService:
     def get_document(
         self,
         document_id: int,
-        user_id: int,
+        user_id: Optional[int] = None,
     ) -> Document:
 
         document = (
             self.db.query(Document)
+            .options(joinedload(Document.user))
             .filter(
-                Document.id == document_id,
-                Document.user_id == user_id,
+                Document.id == document_id
             )
-            .first()
         )
+
+        if user_id is not None:
+            document = document.filter(Document.user_id == user_id)
+
+        document = document.first()
 
         if not document:
             raise HTTPException(
@@ -337,7 +339,7 @@ class DocumentsService:
 
         IngestionService().indexer.delete_document_embeddings(
             document_id=document.id,
-            user_id=document.user_id,
+        
         )
 
         # ----------------------------------------------
