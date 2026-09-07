@@ -1,4 +1,5 @@
 import re
+import json
 
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session, joinedload
@@ -13,13 +14,51 @@ from app.schemas.chat_messages_schema import ChatMessageCreate
 from app.cache.chat_cache import ChatCache
 from app.cache.factory import get_cache
 
-from app.rag.retrieval.RetrieverService import RetrieverService
+from app.rag.retrieval.RetrieverService import RetrieverService, get_retriever
 
 from app.llm.agent import build_agent
+from app.llm.llm import invoke_llm
 from app.llm.request_resolver import resolve_request
-
 from app.rag.generation.tools.document_email_tool import create_document_email_tool
 from app.rag.generation.tools.find_document_tool import create_find_document_tool
+from langchain_core.messages import HumanMessage, SystemMessage
+
+
+def _normalize_answer_content(value) -> str:
+    """Convert provider content blocks into readable assistant text."""
+    if isinstance(value, str):
+        text = value.strip()
+        if text.startswith('"') and text.endswith('"'):
+            try:
+                decoded = json.loads(text)
+                if isinstance(decoded, str):
+                    text = decoded
+            except json.JSONDecodeError:
+                pass
+
+        return (
+            text.replace("\\r\\n", "\n")
+            .replace("\\n", "\n")
+            .replace("\\r", "\n")
+            .replace("\\t", "\t")
+            .replace('\\"', '"')
+        ).strip()
+
+    if isinstance(value, dict):
+        if isinstance(value.get("text"), str):
+            return _normalize_answer_content(value["text"])
+        if isinstance(value.get("content"), (str, list, dict)):
+            return _normalize_answer_content(value["content"])
+        return ""
+
+    if isinstance(value, list):
+        parts = [
+            _normalize_answer_content(part)
+            for part in value
+        ]
+        return "".join(part for part in parts if part)
+
+    return str(value).strip()
 
 
 class ChatService:
@@ -43,7 +82,7 @@ class ChatService:
         self.retriever = (
             retriever
             if retriever is not None
-            else RetrieverService()
+            else get_retriever()
         )
 
     # ==========================================================
@@ -399,7 +438,7 @@ class ChatService:
             retrieval_query = (
                 request_context.document_query or request_context.current_query
             )
-            documents = self.retriever.retriever(query=retrieval_query,top_k=5,)
+            documents = self.retriever.retrieve(query=retrieval_query, top_k=5)
         
 
         # ------------------------------------------------------
@@ -460,56 +499,74 @@ class ChatService:
                 "No relevant documents were retrieved."
             )
         # ------------------------------------------------------
-        # 8. Find document(s) tool
-        # ------------------------------------------------------
-        find_documents_tool = create_find_document_tool(db=self.db)
-
-        # ------------------------------------------------------
-        # 9. Create authorized email tool
+        # 8. Generate a response directly without tool calling
         # ------------------------------------------------------
 
-        document_email_tool = (create_document_email_tool(
-                db=self.db,
-                user_name=user_name,
-                recipient_email=user_email,
-            )
-        )
-
-        # ------------------------------------------------------
-        # 9. Build agent with tools
-        # ------------------------------------------------------
-
-        agent = build_agent(
-            tools=[
-                find_documents_tool,
-                document_email_tool,
-            ]
-        )
-
-        # ------------------------------------------------------
-        # 10. Run agent
-        # ------------------------------------------------------
-
-        result = await  agent.ainvoke(
-            {
-                "input": message_in.content,
-                "request_context": request_context.model_dump_json(indent=2),
-                "context": context,
-                "user_context": (
-                    f"Authenticated user: {user_name}\n"
-                    f"Email: {user_email}\n"
-                    f"User ID: {user_id}"
-                ),
-            }
-        )
+        try:
+            if request_context.needs_email:
+                email_tool = create_document_email_tool(
+                    db=self.db,
+                    user_name=user_name,
+                    recipient_email=user_email,
+                )
+                find_document_tool = create_find_document_tool(
+                    db=self.db,
+                )
+                agent = build_agent(
+                    tools=[find_document_tool, email_tool],
+                )
+                result = await agent.ainvoke(
+                    {
+                        "input": current_message,
+                        "request_context": request_context.model_dump_json(
+                            indent=2,
+                        ),
+                        "context": context,
+                        "user_context": (
+                            f"Authenticated user: {user_name}\n"
+                            f"Email: {user_email}\n"
+                            f"User ID: {user_id}"
+                        ),
+                    }
+                )
+                answer = result.get("output", "")
+            else:
+                response = await invoke_llm(
+                    [
+                        SystemMessage(
+                            content=(
+                                "You are a document assistant. Answer the current user "
+                                "request using only the retrieved document context. "
+                                "If the context does not contain the answer, say that "
+                                "you could not find it. Do not invent facts, document IDs, "
+                                "or actions. Do not call tools.\n\n"
+                                f"REQUEST CONTEXT:\n"
+                                f"{request_context.model_dump_json(indent=2)}\n\n"
+                                f"RETRIEVED DOCUMENT CONTEXT:\n{context}\n\n"
+                                f"USER CONTEXT:\n"
+                                f"Authenticated user: {user_name}\n"
+                                f"Email: {user_email}\n"
+                                f"User ID: {user_id}"
+                            )
+                        ),
+                        HumanMessage(content=current_message),
+                    ]
+                )
+                answer = response.content
+        except Exception as exc:
+            if "TooManyRequests" in type(exc).__name__ or "429" in str(exc):
+                raise HTTPException(
+                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                    detail="The AI provider is temporarily rate-limited. Please try again shortly.",
+                ) from exc
+            raise
 
         # ==========================================================
         # 11. RESPONSE
         # ==========================================================
-        answer = result.get(
-            "output",
-            "I was unable to generate a response.",
-        )
+        answer = _normalize_answer_content(answer)
+        if not answer:
+            answer = "I was unable to generate a response."
 
         # ------------------------------------------------------
         # 12. Save assistant response

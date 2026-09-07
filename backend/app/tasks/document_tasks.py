@@ -96,6 +96,25 @@ def process_document_task(
             user_id=document.user_id,
         )
 
+        # The document may have been deleted while ingestion was running.
+        # Remove chunks created by this task instead of leaving stale content
+        # in the vector store.
+        current_document = (
+            db.query(Document)
+            .filter(Document.id == document_id)
+            .first()
+        )
+
+        if not current_document:
+            ingestion_service.indexer.delete_document_embeddings(
+                document_id=document_id,
+            )
+            logger.info(
+                "Removed embeddings for deleted document %s",
+                document_id,
+            )
+            return False
+
         # ----------------------------------------------
         # Successfully indexed
         # ----------------------------------------------

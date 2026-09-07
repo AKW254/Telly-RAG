@@ -12,7 +12,7 @@ class ChatMessageBase(BaseModel):
 
 
 class ChatMessageCreate(ChatMessageBase):
-    pass
+    role: Optional[str] = None
 
 
 class ChatMessageResponse(ChatMessageBase):

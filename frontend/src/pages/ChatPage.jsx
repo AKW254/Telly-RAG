@@ -1,71 +1,64 @@
-import React, { useEffect, useRef, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
+import { useForm } from "react-hook-form";
+import { useNavigate, useParams } from "react-router-dom";
 import { Bot, Send, User } from "lucide-react";
+import ReactMarkdown from "react-markdown";
+import { createChat } from "../services/chatService";
+import { getMessages, createMessage } from "../services/messagechatService";
 
 function ChatPage() {
   const { id } = useParams();
+  const navigate = useNavigate();
+
+  const {
+    register,
+    handleSubmit,
+    reset,
+    watch,
+    formState: { errors, isSubmitting },
+  } = useForm({
+    defaultValues: {
+      message: "",
+    },
+  });
 
   const [messages, setMessages] = useState([]);
-  const [inputMessage, setInputMessage] = useState("");
+  // Watch the message field so we can disable the Send button
+  const inputMessage = watch("message");
   const [isTyping, setIsTyping] = useState(false);
 
   const messagesEndRef = useRef(null);
 
-  // ============================
-  // Dummy Chat Data
-  // ============================
   useEffect(() => {
-    if (!id) {
-      setMessages([]);
-      return;
-    }
+    let isCurrentRoute = true;
 
-    const chats = {
-      1: [
-        {
-          id: 1,
-          role: "user",
-          content: "Can you help me improve my CV?",
-        },
-        {
-          id: 2,
-          role: "assistant",
-          content:
-            "Sure. Upload your CV and I'll help identify areas for improvement.",
-        },
-      ],
+    setMessages([]);
+    setIsTyping(false);
+    reset();
 
-      2: [
-        {
-          id: 3,
-          role: "user",
-          content: "How do I write a good cover letter?",
-        },
-        {
-          id: 4,
-          role: "assistant",
-          content:
-            "A good cover letter should connect your experience directly to the job requirements.",
-        },
-      ],
+    if (!id)
+      return () => {
+        isCurrentRoute = false;
+      };
 
-      3: [
-        {
-          id: 5,
-          role: "user",
-          content: "Find jobs that match my skills.",
-        },
-        {
-          id: 6,
-          role: "assistant",
-          content:
-            "I can help you identify jobs based on your skills, experience, and CV.",
-        },
-      ],
+    const fetchMessages = async () => {
+      try {
+        const data = await getMessages(id);
+        if (isCurrentRoute) {
+          setMessages(data);
+        }
+      } catch (error) {
+        if (isCurrentRoute) {
+          console.error("Error fetching messages:", error);
+        }
+      }
     };
+    fetchMessages();
 
-    setMessages(chats[id] || []);
-  }, [id]);
+    return () => {
+      isCurrentRoute = false;
+    };
+  }, [id, reset]);
 
   // ============================
   // Auto Scroll
@@ -79,39 +72,68 @@ function ChatPage() {
   // ============================
   // Send Message
   // ============================
-  const handleSendMessage = (e) => {
-    e.preventDefault();
+  const handleSendMessage = async (data) => {
+    const content = data.message.trim();
+    let pendingMessageId;
+    let chatId = id;
 
-    const message = inputMessage.trim();
+    try {
+      setIsTyping(true);
 
-    if (!message || isTyping) return;
+      const chat = id ? null : await createChat({ title: content });
+      chatId = id || chat?.id;
 
-    // Add user message
-    const userMessage = {
-      id: Date.now(),
-      role: "user",
-      content: message,
-    };
+      if (!chatId) {
+        throw new Error("The chat could not be created.");
+      }
 
-    setMessages((prev) => [...prev, userMessage]);
-    setInputMessage("");
+      if (!id) {
+        window.dispatchEvent(new Event("chats-updated"));
+      }
 
-    // Simulate AI response
-    setIsTyping(true);
-
-    setTimeout(() => {
-      const assistantMessage = {
-        id: Date.now() + 1,
-        role: "assistant",
-        content:
-          "This is a simulated response. Later, this message can come from your FastAPI/LangGraph backend.",
+      const userMessage = {
+        id: `pending-${Date.now()}`,
+        chat_id: chatId,
+        role: "user",
+        content,
+        created_at: new Date().toISOString(),
       };
+      pendingMessageId = userMessage.id;
 
+      setMessages((prev) => [...prev, userMessage]);
+      reset();
+
+      const assistantMessage = await createMessage(chatId, { content });
       setMessages((prev) => [...prev, assistantMessage]);
-      setIsTyping(false);
-    }, 1200);
-  };
 
+      if (!id) {
+        navigate(`/chat/${chatId}`, { replace: true });
+      }
+    } catch (error) {
+      console.error("Error sending message:", error);
+
+      if (pendingMessageId) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: `fallback-${Date.now()}`,
+            chat_id: chatId,
+            role: "assistant",
+            content:
+              "I received your message, but I could not generate an answer right now. Please try again in a moment.",
+            created_at: new Date().toISOString(),
+          },
+        ]);
+      }
+
+      if (!id && chatId) {
+        window.dispatchEvent(new Event("chats-updated"));
+        navigate(`/chat/${chatId}`, { replace: true });
+      }
+    } finally {
+      setIsTyping(false);
+    }
+  };
   // ============================
   // Keyboard Handler
   // ============================
@@ -119,7 +141,7 @@ function ChatPage() {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
 
-      handleSendMessage(e);
+      handleSubmit(handleSendMessage)();
     }
   };
 
@@ -141,8 +163,7 @@ function ChatPage() {
               </h2>
 
               <p className="mt-1 max-w-md text-sm text-gray-500">
-                Ask me about your CV, job applications, cover letters, or
-                finding relevant jobs.
+                Ask me about anything about available documents.
               </p>
             </div>
           ) : (
@@ -171,6 +192,8 @@ function ChatPage() {
                         px-4 py-3
                         text-sm
                         leading-6
+                        whitespace-pre-wrap
+                        break-words
                         shadow-sm
                         sm:max-w-[70%]
                         ${
@@ -180,7 +203,48 @@ function ChatPage() {
                         }
                       `}
                   >
-                    {msg.content}
+                    {isUser ? (
+                      msg.content
+                    ) : (
+                      <ReactMarkdown
+                        components={{
+                          p: ({ children }) => (
+                            <p className="mb-3 last:mb-0">{children}</p>
+                          ),
+                          ul: ({ children }) => (
+                            <ul className="mb-3 list-disc space-y-1 pl-5 last:mb-0">
+                              {children}
+                            </ul>
+                          ),
+                          ol: ({ children }) => (
+                            <ol className="mb-3 list-decimal space-y-1 pl-5 last:mb-0">
+                              {children}
+                            </ol>
+                          ),
+                          li: ({ children }) => <li>{children}</li>,
+                          strong: ({ children }) => (
+                            <strong className="font-semibold">
+                              {children}
+                            </strong>
+                          ),
+                          h1: ({ children }) => (
+                            <h1 className="mb-2 text-base font-semibold">
+                              {children}
+                            </h1>
+                          ),
+                          h2: ({ children }) => (
+                            <h2 className="mb-2 text-base font-semibold">
+                              {children}
+                            </h2>
+                          ),
+                          h3: ({ children }) => (
+                            <h3 className="mb-2 font-semibold">{children}</h3>
+                          ),
+                        }}
+                      >
+                        {msg.content}
+                      </ReactMarkdown>
+                    )}
                   </div>
 
                   {/* User Avatar */}
@@ -220,17 +284,17 @@ function ChatPage() {
         ============================ */}
       <div className="shrink-0 border-t border-gray-200 bg-white px-3 py-3">
         <form
-          onSubmit={handleSendMessage}
+          onSubmit={handleSubmit(handleSendMessage)}
           className="mx-auto flex max-w-4xl items-end gap-2"
         >
           <div className="relative flex-1">
             <textarea
               value={inputMessage}
-              onChange={(e) => setInputMessage(e.target.value)}
+              {...register("message", { required: "No Message" })}
               onKeyDown={handleKeyDown}
               disabled={isTyping}
               rows={1}
-              placeholder="Ask about your CV, jobs, or applications..."
+              placeholder="Ask about your available documents"
               className="
                   block
                   w-full
@@ -254,10 +318,40 @@ function ChatPage() {
                   disabled:opacity-60
                 "
             />
-
-            <span className="absolute bottom-2 right-3 hidden text-[10px] text-gray-400 sm:block">
-              Enter to send
-            </span>
+            {errors.message?.message && (
+              <p className="mt-2 text-sm text-red-500">
+                {errors.message.message}
+              </p>
+            )}
+            {isSubmitting ? (
+              <span className="absolute bottom-2 right-3 hidden text-[10px] text-gray-400 sm:block">
+                <svg
+                  className="h-4 w-4 animate-spin text-white/90"
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                >
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                  ></circle>
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                  ></path>
+                </svg>
+                Sending
+              </span>
+            ) : (
+              <span className="absolute bottom-2 right-3 hidden text-[10px] text-gray-400 sm:block">
+                Enter to Send
+              </span>
+            )}
           </div>
 
           <button
@@ -288,7 +382,7 @@ function ChatPage() {
         </form>
 
         <p className="mx-auto mt-2 hidden max-w-4xl text-center text-[11px] text-gray-400 sm:block">
-          AI responses are simulated for now.
+          AI responses are based On Available Documents
         </p>
       </div>
     </div>

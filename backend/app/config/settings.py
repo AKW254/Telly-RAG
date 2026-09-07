@@ -40,6 +40,7 @@ class Settings(BaseSettings):
     openrouter_api_key: str
     openrouter_base_url: str
     openrouter_model_name: str
+    openrouter_fallback_model_name: str | None = "openrouter/auto"
     
     #===========lANGSMITH ===================
     langsmith_tracing: bool = True
