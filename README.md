@@ -1,6 +1,8 @@
 # Telly RAG
 
 Telly RAG is an AI-assisted, document-aware chat application. Users can create an account, upload documents, ask questions about their documents, maintain separate chat conversations, and request a document by email.
+## Screenshots
+<table> <tr> <td align="center" width="50%"> <strong>Login Page</strong><br><br> <img src="screenshots/Screenshot(4).png" alt="Telly RAG Login Page" width="100%"> </td> <td align="center" width="50%"> <strong>Chat Panel</strong><br><br> <img src="screenshots/Screenshot(5).png" alt="Telly RAG Chat Panel" width="100%"> </td> </tr> <tr> <td align="center" width="50%"> <strong>Chat Board</strong><br><br> <img src="screenshots/Screenshot(8).png" alt="Telly RAG Chat Board" width="100%"> </td> <td align="center" width="50%"> <strong>Profile & Settings</strong><br><br> <img src="screenshots/Screenshot(6).png" alt="Telly RAG Profile and Settings" width="100%"> </td> </tr> <tr> <td align="center" width="50%"> <strong>Documents Management</strong><br><br> <img src="screenshots/Screenshot(7).png" alt="Telly RAG Documents Management" width="100%"> </td> <td width="50%"></td> </tr> </table>
 
 The project is split into two applications:
 
